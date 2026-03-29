@@ -29,3 +29,5 @@ engine/.pytest_cache/
 *.sw?
 .DS_Store
 Thumbs.db
+
+uploads/
