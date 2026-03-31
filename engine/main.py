@@ -4,6 +4,7 @@ import os
 from pydantic import BaseModel
 
 from parser.dispatcher import process_project
+from graph.builder import build_project_graph
 
 load_dotenv()
 app=FastAPI()
@@ -23,10 +24,14 @@ def trigger_parsing(request:ParseRequest):
     try:
         parsed_data=process_project(request.folder_path)
 
-        return{
-            "message":"Parsing sussessful",
-            "files analysed": len(parsed_data),
-            "data":parsed_data
+        graph=build_project_graph(parsed_data)
+
+        return {
+            "message": "Graph built successfully!", 
+            "total_nodes": len(graph.nodes),
+            "total_edges": sum(len(edges) for edges in graph.adj.values()),
+            "cycles_detected": len(graph.detect_cycles()),
+            "nodes_data": graph.nodes
         }
     except Exception as e:
         return{
