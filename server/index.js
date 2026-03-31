@@ -8,6 +8,7 @@ import fs from "fs";
 import path from "path";
 import crypto from "crypto";
 import Project from "./models/Project.js";
+import axios from "axios";
 
 
 dotenv.config();
@@ -53,6 +54,10 @@ app.post("/api/upload",upload.single("repo"),async(req,res)=>{
         });
 
         await project.save();
+        axios.post("http://localhost:8000/api/parse",{
+            project_id:projectId,
+            folder_path:extractFolderPath
+        }).catch(err=>console.log("failed to trigger python engine",err.message));
         res.json({ message: "Upload success", project_id: projectId, status: "processing" });
 
         
@@ -72,6 +77,21 @@ app.get("/api/projects/:id", async (req, res) => {
     if (!project) return res.status(404).json({ error: "Project not found" });
     res.json(project);
 });
+
+app.patch("/api/projects/:id/status",async(req,res)=>{
+    try{
+        const {status}=req.body;
+        const project=await Project.findOneAndUpdate(
+            {project_id:req.params.id},
+            {status:status},
+            {returnDocument: 'after'}
+        );
+        res.json(project);
+    }catch(error){
+        console.error("status update error:",error);
+        res.status(500).json({error:"failed to update project status"});
+    }
+})
 
 
 app.get("/", (req, res) => {
