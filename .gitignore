@@ -31,3 +31,4 @@ engine/.pytest_cache/
 Thumbs.db
 
 uploads/
+chroma_store/

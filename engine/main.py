@@ -6,6 +6,9 @@ from graph.neo4j_client import Neo4jClient
 
 from parser.dispatcher import process_project
 from graph.builder import build_project_graph
+from rag.chunker import build_chunks
+from rag.embedder import embed_chunks
+from rag.vector_store import get_or_create_collection, add_chunks
 import requests
 
 load_dotenv()
@@ -27,30 +30,42 @@ def trigger_parsing(request:ParseRequest,background_tasks:BackgroundTasks):
     
     return {"message": "Parsing pipeline queued successfully"}
 
-def run_parsing_pipeline(project_id:str,folder_path:str):
+def run_parsing_pipeline(project_id: str, folder_path: str):
     try:
-        print(f"Background Task: Starting parsing for {project_id}")
+        print(f"[1/4] Parsing files for {project_id}...")
         parsed_data = process_project(folder_path)
-        
-        print("Background Task: Building Graph...")
+
+        print("[2/4] Building Dependency Graph...")
         graph = build_project_graph(parsed_data)
-        
-        print("Background Task: Pushing to Neo4j...")
         neo4j_client.store_project_graph(project_id, graph)
 
-        print("Background Task: Done! Updating Node.js database...")
+        print("[3/4] Chunking and Embedding code...")
+        chunks = build_chunks(parsed_data, project_id)
+        print(f"      Generated {len(chunks)} chunks. Embedding now...")
+        embeddings = embed_chunks(chunks)
 
+        print("[4/4] Storing vectors in ChromaDB...")
+        collection = get_or_create_collection(project_id)
+        add_chunks(collection, chunks, embeddings)
+
+        print("Pipeline Fully Completed! Updating status...")
         requests.patch(
             f"http://localhost:3000/api/projects/{project_id}/status",
             json={"status": "ready"}
         )
-        print("Pipeline Fully Completed!")
+
     except Exception as e:
         print(f"Pipeline Failed: {str(e)}")
         requests.patch(
             f"http://localhost:3000/api/projects/{project_id}/status",
             json={"status": "error"}
         )
-        
 
 
+
+@app.get("/api/test-chroma/{project_id}")
+def test_chroma(project_id: str):
+    from rag.vector_store import get_or_create_collection
+    collection = get_or_create_collection(project_id)
+    count = collection.count()
+    return {"project_id": project_id, "chunks_stored": count}
