@@ -85,3 +85,75 @@ def structural_query(project_id:str)->dict:
     else:
         context += "No circular imports detected.\n"
     return {"type": "structural", "hubs": hubs, "cyclic_files": cyclic_files, "context": context}
+
+
+
+def get_reactflow_graph(project_id:str)->dict:
+    with driver.session() as session:
+        nodes_result = session.run("""
+            MATCH (f:File {project_id: $pid})
+            RETURN f.path AS path, f.language AS language,
+                   f.is_hub AS is_hub, f.has_cycle AS has_cycle,
+                   f.topo_order AS topo_order, f.in_degree AS in_degree,
+                   f.function_count AS function_count
+        """, pid=project_id)
+
+        edges_result = session.run("""
+            MATCH (a:File {project_id: $pid})-[:IMPORTS]->(b:File {project_id: $pid})
+            RETURN a.path AS source, b.path AS target
+        """, pid=project_id)
+
+        topo_groups={}
+        raw_nodes=list(nodes_result)
+
+        for r in raw_nodes:
+            topo=r["topo_order"] or 1
+            if topo not in topo_groups:
+                topo_groups[topo]=[]
+            topo_groups[topo].append(r)
+        
+        nodes=[]
+        x_gap=200
+        y_gap=160
+
+        for topo_order, group in sorted(topo_groups.items()):
+            for i, r in enumerate(group):
+                path = r["path"]
+                filename = path.replace("\\", "/").split("/")[-1]
+                nodes.append({
+                    "id":       path,
+                    "type":     "default",
+                    "data": {
+                        "label":          filename,
+                        "full_path":      path,
+                        "language":       r["language"] or "unknown",
+                        "is_hub":         r["is_hub"] or False,
+                        "has_cycle":      r["has_cycle"] or False,
+                        "topo_order":     r["topo_order"] or 0,
+                        "in_degree":      r["in_degree"] or 0,
+                        "function_count": r["function_count"] or 0
+                    },
+                    "position": {
+                        "x": (topo_order - 1) * x_gap,
+                        "y": i * y_gap - ((len(group) - 1) * y_gap / 2)
+                    }
+                })
+        
+        edges=[]
+        seen=set()
+
+        for r in list(edges_result):
+            eid=f"{r['source']}→{r['target']}"
+            if eid not in seen:
+                seen.add(eid)
+                edges.append({
+                    "id":       eid,
+                    "source":   r["source"],
+                    "target":   r["target"],
+                    "animated": True,
+                    "label":    "imports",
+                    "style":    {"stroke": "#6366f1"}
+                })
+        
+    return {"nodes":nodes,"edges":edges}
+

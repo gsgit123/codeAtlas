@@ -10,9 +10,10 @@ from rag.chunker import build_chunks
 from rag.embedder import embed_chunks
 from rag.vector_store import get_or_create_collection, add_chunks,search_chunks
 from query.router import classify_query
-from query.graph_retriever import impact_query, trace_query, structural_query
+from query.graph_retriever import impact_query, trace_query, structural_query, get_reactflow_graph
 from rag.retriever import retrieve
 from query.engine import run_query
+
 
 import requests
 
@@ -140,4 +141,8 @@ def test_structural(project_id: str):
 def query_endpoint(req:QueryRequest):
     result=run_query(req.project_id,req.question)
     return result
-    
+
+@app.get("/api/graph/{project_id}")
+def get_graph(project_id: str):
+    result = get_reactflow_graph(project_id)
+    return result

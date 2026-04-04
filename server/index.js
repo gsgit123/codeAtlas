@@ -94,6 +94,32 @@ app.patch("/api/projects/:id/status",async(req,res)=>{
 })
 
 
+app.post("/api/query",async(req,res)=>{
+    try{
+        const {project_id,question}=req.body;
+        const response=await axios.post("http://localhost:8000/api/query",{
+            project_id,
+            question
+        });
+        res.json(response.data);
+    }catch(error){
+        console.error("query error:",error);
+        res.status(500).json({error:"failed to answer query"});
+    }
+});
+
+app.get("/api/projects/:id/graph",async(req,res)=>{
+    try {
+        const response=await axios.get(`http://localhost:8000/api/graph/${req.params.id}`);
+        res.json(response.data);
+        
+    } catch (error) {
+        console.error("Graph proxy error:", error.message);
+        res.status(500).json({ error: "Failed to fetch graph" });
+    }
+})
+
+
 app.get("/", (req, res) => {
     res.send("Hello World!");
 });
