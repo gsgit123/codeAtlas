@@ -30,7 +30,7 @@ def add_chunks(collection,chunks:list,embeddings:list):
         ]
     )
 
-def search_chunks(collection,query_embeddings:list,tok_k:int=20)->list:
+def search_chunks(collection,query_embeddings:list,top_k:int=20)->list:
     results=collection.query(
         query_embeddings=[query_embeddings],
         n_results=top_k
