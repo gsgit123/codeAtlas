@@ -1,6 +1,7 @@
-from fastapi import FastAPI,BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks
 from dotenv import load_dotenv
 import os
+import shutil
 from pydantic import BaseModel
 from graph.neo4j_client import Neo4jClient
 
@@ -66,17 +67,29 @@ def run_parsing_pipeline(project_id: str, folder_path: str):
         add_chunks(collection, chunks, embeddings)
 
         print("Pipeline Fully Completed! Updating status...")
+        # Fix #7: Use env var for Node server URL
+        node_url = os.getenv("NODE_URL", "http://localhost:3000")
         requests.patch(
-            f"http://localhost:3000/api/projects/{project_id}/status",
+            f"{node_url}/api/projects/{project_id}/status",
             json={"status": "ready"}
         )
 
     except Exception as e:
         print(f"Pipeline Failed: {str(e)}")
+        node_url = os.getenv("NODE_URL", "http://localhost:3000")
         requests.patch(
-            f"http://localhost:3000/api/projects/{project_id}/status",
+            f"{node_url}/api/projects/{project_id}/status",
             json={"status": "error"}
         )
+
+    finally:
+        # Fix #8: Always clean up the extracted uploads folder to prevent disk fill-up
+        if os.path.exists(folder_path):
+            try:
+                shutil.rmtree(folder_path)
+                print(f"[Cleanup] Deleted extracted folder: {folder_path}")
+            except Exception as cleanup_err:
+                print(f"[Cleanup] Failed to delete {folder_path}: {cleanup_err}")
 
 
 

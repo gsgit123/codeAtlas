@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import ReactFlow, {
   Background,
   Controls,
@@ -8,7 +8,37 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
 } from 'reactflow'
+import dagre from '@dagrejs/dagre'
 import 'reactflow/dist/style.css'
+
+const NODE_W = 180
+const NODE_H = 70
+
+function applyDagreLayout(rawNodes, rawEdges) {
+  const g = new dagre.graphlib.Graph()
+  g.setDefaultEdgeLabel(() => ({}))
+  g.setGraph({ rankdir: 'LR', ranksep: 120, nodesep: 60, edgesep: 20 })
+
+  rawNodes.forEach(n => g.setNode(n.id, { width: NODE_W, height: NODE_H }))
+  rawEdges.forEach(e => {
+    if (g.hasNode(e.source) && g.hasNode(e.target)) {
+      g.setEdge(e.source, e.target)
+    }
+  })
+
+  dagre.layout(g)
+
+  return rawNodes.map(n => {
+    const pos = g.node(n.id)
+    return {
+      ...n,
+      position: {
+        x: pos ? pos.x - NODE_W / 2 : 0,
+        y: pos ? pos.y - NODE_H / 2 : 0,
+      }
+    }
+  })
+}
 
 function CodeNode({ data, selected }) {
   const isHub       = data.is_hub
@@ -25,14 +55,12 @@ function CodeNode({ data, selected }) {
       border: `1.5px solid ${borderColor}`,
       borderRadius: '10px',
       padding: '10px 14px',
-      minWidth: '140px',
-      maxWidth: '180px',
+      width: `${NODE_W}px`,
       boxShadow: selected
         ? `0 0 0 2px ${borderColor}, 0 0 20px ${glowColor}`
         : `0 0 12px ${glowColor}`,
       cursor: 'pointer',
       transition: 'all 0.2s',
-      position: 'relative'
     }}>
       <Handle type="target" position={Position.Left}  style={{ background: borderColor, border: 'none', width: 8, height: 8 }} />
       <Handle type="source" position={Position.Right} style={{ background: borderColor, border: 'none', width: 8, height: 8 }} />
@@ -60,35 +88,42 @@ const nodeTypes = { default: CodeNode }
 
 const edgeDefaults = {
   style:     { stroke: '#3f3f46', strokeWidth: 1.5 },
-  markerEnd: { type: 'arrowclosed', color: '#3f3f46', width: 16, height: 16 },
-  animated:  false,
+  markerEnd: { type: 'arrowclosed', color: '#3f3f46', width: 14, height: 14 },
 }
 
 export default function GraphPanel({ nodes: rawNodes, edges: rawEdges, highlightIds, onNodeClick }) {
-  const enriched = rawNodes.map(n => ({
-    ...n,
-    data: { ...n.data, highlighted: highlightIds.includes(n.id) }
-  }))
 
-  const styledEdges = rawEdges.map(e => ({
+  // Apply dagre layout + highlight enrichment
+  const layoutedNodes = useMemo(() => {
+    const enriched = rawNodes.map(n => ({
+      ...n,
+      data: { ...n.data, highlighted: highlightIds.includes(n.id) }
+    }))
+    return applyDagreLayout(enriched, rawEdges)
+  }, [rawNodes, rawEdges])
+
+  const layoutedEdges = useMemo(() => rawEdges.map(e => ({
     ...e,
     ...edgeDefaults,
     animated: highlightIds.includes(e.source) || highlightIds.includes(e.target),
     style: {
       ...edgeDefaults.style,
-      stroke: (highlightIds.includes(e.source) || highlightIds.includes(e.target)) ? '#10b981' : '#3f3f46'
+      stroke: (highlightIds.includes(e.source) || highlightIds.includes(e.target))
+        ? '#10b981' : '#3f3f46'
     }
-  }))
+  })), [rawEdges, highlightIds])
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(enriched)
-  const [edges, setEdges, onEdgesChange] = useEdgesState(styledEdges)
+  const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes)
+  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutedEdges)
 
+  // Re-sync when highlights or raw data change
   useEffect(() => {
-    setNodes(rawNodes.map(n => ({
+    const enriched = rawNodes.map(n => ({
       ...n,
       data: { ...n.data, highlighted: highlightIds.includes(n.id) }
-    })))
-  }, [highlightIds, rawNodes])
+    }))
+    setNodes(applyDagreLayout(enriched, rawEdges))
+  }, [highlightIds, rawNodes, rawEdges])
 
   useEffect(() => {
     setEdges(rawEdges.map(e => ({
@@ -97,7 +132,8 @@ export default function GraphPanel({ nodes: rawNodes, edges: rawEdges, highlight
       animated: highlightIds.includes(e.source) || highlightIds.includes(e.target),
       style: {
         ...edgeDefaults.style,
-        stroke: (highlightIds.includes(e.source) || highlightIds.includes(e.target)) ? '#10b981' : '#3f3f46'
+        stroke: (highlightIds.includes(e.source) || highlightIds.includes(e.target))
+          ? '#10b981' : '#3f3f46'
       }
     })))
   }, [highlightIds, rawEdges])
@@ -116,8 +152,8 @@ export default function GraphPanel({ nodes: rawNodes, edges: rawEdges, highlight
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClickHandler}
         fitView
-        fitViewOptions={{ padding: 0.3 }}
-        minZoom={0.2}
+        fitViewOptions={{ padding: 0.15 }}
+        minZoom={0.05}
         maxZoom={2}
         attributionPosition="bottom-left"
       >
@@ -125,7 +161,7 @@ export default function GraphPanel({ nodes: rawNodes, edges: rawEdges, highlight
         <Controls style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }} />
         <MiniMap
           style={{ background: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }}
-          nodeColor={(n) => n.data?.is_hub ? '#f59e0b' : n.data?.has_cycle ? '#ef4444' : '#3f3f46'}
+          nodeColor={(n) => n.data?.highlighted ? '#10b981' : n.data?.is_hub ? '#f59e0b' : n.data?.has_cycle ? '#ef4444' : '#3f3f46'}
           maskColor="rgba(9,9,11,0.85)"
         />
       </ReactFlow>

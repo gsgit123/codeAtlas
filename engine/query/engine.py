@@ -88,8 +88,28 @@ def parse_citations(answer: str) -> tuple:
     return files_used, nodes_used
 
 
-#full query
+def detect_mentioned_files(question: str, all_chunks: list) -> list:
+    """If the question mentions a specific filename, return chunks from that file first."""
+    # Find all word-like tokens that look like filenames (contain a dot + extension)
+    tokens = re.findall(r'[\w\-]+\.\w+', question)
+    if not tokens:
+        return []
 
+    boosted = []
+    for token in tokens:
+        token_lower = token.lower()
+        for chunk in all_chunks:
+            file_path = chunk.get("file", "").replace("\\", "/").lower()
+            if file_path.endswith(token_lower):
+                if chunk not in boosted:
+                    boosted.append(chunk)
+
+    if boosted:
+        print(f"  [Engine] Filename boost: found {len(boosted)} chunks for {tokens}")
+    return boosted
+
+
+#full query
 def run_query(project_id:str,question:str):
     print(f"\n========== New Query ==========")
     print(f"Question: {question}")
@@ -99,7 +119,6 @@ def run_query(project_id:str,question:str):
     cached=cache_lookup(query_vector)
     if cached:
         return cached
-    
 
     #classify question
     route=classify_query(question)
@@ -121,11 +140,29 @@ def run_query(project_id:str,question:str):
         }
         for i in range(len(all_results["documents"]))
     ]
-    rag_chunks=retrieve(question,collection,all_chunks,top_k=5)
 
+    # --- FIX 3: Detect filename mentions and boost those chunks ---
+    filename_chunks = detect_mentioned_files(question, all_chunks)
+
+    # Standard hybrid retrieval
+    rag_chunks = retrieve(question, collection, all_chunks, top_k=5)
+
+    # Merge: filename-specific chunks first, then semantic results (deduplicated)
+    if filename_chunks:
+        seen_files = set(c["file"] for c in filename_chunks)
+        semantic_extras = [c for c in rag_chunks if c["metadata"]["file"] not in seen_files]
+        # Convert filename_chunks to retriever format
+        filename_hits = [{
+            "text": c["text"],
+            "metadata": {
+                "file": c["file"], "name": c["name"], "type": c["type"],
+                "start_line": c["start_line"], "end_line": c["end_line"],
+                "language": c["language"], "project_id": c["project_id"]
+            }
+        } for c in filename_chunks[:3]]
+        rag_chunks = filename_hits + semantic_extras[:3]
 
     #graph retrieval
-
     graph_context=""
     try:
         if route=="impact":
@@ -134,7 +171,7 @@ def run_query(project_id:str,question:str):
             if file_hint:
                 result = impact_query(project_id, file_hint)
                 graph_context = result["context"]
-        
+
         elif route=="trace":
             result = structural_query(project_id)
             graph_context = result["context"]
@@ -146,7 +183,6 @@ def run_query(project_id:str,question:str):
     except Exception as e:
         print(f"  [Engine] Graph retrieval failed: {e}")
         graph_context = ""
-
 
     #build prompt
     prompt=build_prompt(question,rag_chunks,graph_context)
@@ -170,9 +206,7 @@ def run_query(project_id:str,question:str):
         "nodes_used": nodes_used,
         "chunks_used": len(rag_chunks)
     }
-    # Store in cache for future similar questions
     cache_store(query_vector, result)
-
     return result
 
 

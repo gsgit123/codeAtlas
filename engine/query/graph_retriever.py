@@ -1,5 +1,6 @@
 import os
 from neo4j import GraphDatabase
+from neo4j.exceptions import ServiceUnavailable
 from dotenv import load_dotenv
 load_dotenv()
 driver = GraphDatabase.driver(
@@ -88,72 +89,74 @@ def structural_query(project_id:str)->dict:
 
 
 
-def get_reactflow_graph(project_id:str)->dict:
-    with driver.session() as session:
-        nodes_result = session.run("""
-            MATCH (f:File {project_id: $pid})
-            RETURN f.path AS path, f.language AS language,
-                   f.is_hub AS is_hub, f.has_cycle AS has_cycle,
-                   f.topo_order AS topo_order, f.in_degree AS in_degree,
-                   f.function_count AS function_count
-        """, pid=project_id)
+def get_reactflow_graph(project_id: str) -> dict:
+    try:
+        with driver.session() as session:
+            nodes_result = session.run("""
+                MATCH (f:File {project_id: $pid})
+                RETURN f.path AS path, f.language AS language,
+                       f.is_hub AS is_hub, f.has_cycle AS has_cycle,
+                       f.topo_order AS topo_order, f.in_degree AS in_degree,
+                       f.function_count AS function_count
+            """, pid=project_id)
 
-        edges_result = session.run("""
-            MATCH (a:File {project_id: $pid})-[:IMPORTS]->(b:File {project_id: $pid})
-            RETURN a.path AS source, b.path AS target
-        """, pid=project_id)
+            edges_result = session.run("""
+                MATCH (a:File {project_id: $pid})-[:IMPORTS]->(b:File {project_id: $pid})
+                RETURN a.path AS source, b.path AS target
+            """, pid=project_id)
 
-        topo_groups={}
-        raw_nodes=list(nodes_result)
+            topo_groups = {}
+            raw_nodes = list(nodes_result)
 
-        for r in raw_nodes:
-            topo=r["topo_order"] or 1
-            if topo not in topo_groups:
-                topo_groups[topo]=[]
-            topo_groups[topo].append(r)
-        
-        nodes=[]
-        x_gap=200
-        y_gap=160
+            for r in raw_nodes:
+                topo = r["topo_order"] or 1
+                if topo not in topo_groups:
+                    topo_groups[topo] = []
+                topo_groups[topo].append(r)
 
-        for topo_order, group in sorted(topo_groups.items()):
-            for i, r in enumerate(group):
-                path = r["path"]
-                filename = path.replace("\\", "/").split("/")[-1]
-                nodes.append({
-                    "id":       path,
-                    "type":     "default",
-                    "data": {
-                        "label":          filename,
-                        "full_path":      path,
-                        "language":       r["language"] or "unknown",
-                        "is_hub":         r["is_hub"] or False,
-                        "has_cycle":      r["has_cycle"] or False,
-                        "topo_order":     r["topo_order"] or 0,
-                        "in_degree":      r["in_degree"] or 0,
-                        "function_count": r["function_count"] or 0
-                    },
-                    "position": {
-                        "x": (topo_order - 1) * x_gap,
-                        "y": i * y_gap - ((len(group) - 1) * y_gap / 2)
-                    }
-                })
-        
-        edges=[]
-        seen=set()
+            nodes = []
+            x_gap = 200
+            y_gap = 160
 
-        for r in list(edges_result):
-            eid=f"{r['source']}→{r['target']}"
-            if eid not in seen:
-                seen.add(eid)
-                edges.append({
-                    "id":       eid,
-                    "source":   r["source"],
-                    "target":   r["target"],
-                    "animated": True,
-                    "label":    "imports",
-                    "style":    {"stroke": "#6366f1"}
-                })
-        
-    return {"nodes":nodes,"edges":edges}
+            for topo_order, group in sorted(topo_groups.items()):
+                for i, r in enumerate(group):
+                    path = r["path"]
+                    filename = path.replace("\\", "/").split("/")[-1]
+                    nodes.append({
+                        "id":   path,
+                        "type": "default",
+                        "data": {
+                            "label":          filename,
+                            "full_path":      path,
+                            "language":       r["language"] or "unknown",
+                            "is_hub":         r["is_hub"] or False,
+                            "has_cycle":      r["has_cycle"] or False,
+                            "topo_order":     r["topo_order"] or 0,
+                            "in_degree":      r["in_degree"] or 0,
+                            "function_count": r["function_count"] or 0
+                        },
+                        "position": {
+                            "x": (topo_order - 1) * x_gap,
+                            "y": i * y_gap - ((len(group) - 1) * y_gap / 2)
+                        }
+                    })
+
+            edges = []
+            seen = set()
+
+            for r in list(edges_result):
+                eid = f"{r['source']}\u2192{r['target']}"
+                if eid not in seen:
+                    seen.add(eid)
+                    edges.append({
+                        "id":     eid,
+                        "source": r["source"],
+                        "target": r["target"],
+                    })
+
+        return {"nodes": nodes, "edges": edges}
+
+    except ServiceUnavailable:
+        print("[graph_retriever] Neo4j is unavailable. Check your Aura dashboard and resume the database.")
+        return {"nodes": [], "edges": [], "error": "Neo4j database is paused or unreachable. Please resume it from console.neo4j.io and refresh."}
 

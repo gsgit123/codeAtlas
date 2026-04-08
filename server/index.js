@@ -21,13 +21,22 @@ mongoose.connect(process.env.MONGODB_URI)
 
 const app = express();
 
-app.use(cors());
+// Fix #2: Lock CORS to specific frontend origin
+const allowedOrigin = process.env.CLIENT_URL || "http://localhost:5173";
+app.use(cors({ origin: allowedOrigin, credentials: true }));
 app.use(express.json());
 
-
-
-const upload=multer({
-    dest:"uploads/"
+// Fix #3: 50MB upload size limit + only accept zip files
+const upload = multer({
+    dest: "uploads/",
+    limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype === "application/zip" || file.originalname.endsWith(".zip")) {
+            cb(null, true);
+        } else {
+            cb(new Error("Only .zip files are allowed"), false);
+        }
+    }
 })
 
 app.post("/api/upload",upload.single("repo"),async(req,res)=>{
@@ -54,10 +63,12 @@ app.post("/api/upload",upload.single("repo"),async(req,res)=>{
         });
 
         await project.save();
-        axios.post("http://localhost:8000/api/parse",{
-            project_id:projectId,
-            folder_path:extractFolderPath
-        }).catch(err=>console.log("failed to trigger python engine",err.message));
+        // Fix #7: Use env var for engine URL
+        const engineUrl = process.env.ENGINE_URL || "http://localhost:8000";
+        axios.post(`${engineUrl}/api/parse`, {
+            project_id: projectId,
+            folder_path: extractFolderPath
+        }).catch(err => console.log("failed to trigger python engine", err.message));
         res.json({ message: "Upload success", project_id: projectId, status: "processing" });
 
         
@@ -97,7 +108,8 @@ app.patch("/api/projects/:id/status",async(req,res)=>{
 app.post("/api/query",async(req,res)=>{
     try{
         const {project_id,question}=req.body;
-        const response=await axios.post("http://localhost:8000/api/query",{
+        const engineUrl = process.env.ENGINE_URL || "http://localhost:8000";
+        const response=await axios.post(`${engineUrl}/api/query`,{
             project_id,
             question
         });
@@ -110,9 +122,9 @@ app.post("/api/query",async(req,res)=>{
 
 app.get("/api/projects/:id/graph",async(req,res)=>{
     try {
-        const response=await axios.get(`http://localhost:8000/api/graph/${req.params.id}`);
+        const engineUrl = process.env.ENGINE_URL || "http://localhost:8000";
+        const response=await axios.get(`${engineUrl}/api/graph/${req.params.id}`);
         res.json(response.data);
-        
     } catch (error) {
         console.error("Graph proxy error:", error.message);
         res.status(500).json({ error: "Failed to fetch graph" });

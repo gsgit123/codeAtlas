@@ -1,39 +1,31 @@
-from google import genai
-from google.genai import types
 import os
-import time
+import requests
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
-# New SDK client
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+HF_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
+API_URL = "https://router.huggingface.co/hf-inference/models/BAAI/bge-small-en-v1.5"
+HEADERS = {"Authorization": f"Bearer {HF_API_KEY}"}
+
 
 def embed_text(text: str) -> list:
-    """Embeds a single string into a vector using Gemini."""
-    response = client.models.embed_content(
-        model    = "gemini-embedding-001",
-        contents = text
-    )
-    return response.embeddings[0].values
+    response = requests.post(API_URL, headers=HEADERS, json={"inputs": [text]})
+    return response.json()[0]
 
-def embed_chunks(chunks: list, batch_size: int = 10) -> list:
-    """
-    Embeds a list of chunks in batches.
-    Sleeps between batches to respect Gemini's free tier rate limits.
-    """
+def embed_chunks(chunks: list, batch_size: int = 50) -> list:
     embeddings = []
-
+    # We can use larger batches now because HF rate limits are much better
     for i in range(0, len(chunks), batch_size):
-        batch = chunks[i : i + batch_size]
-        print(f"  Embedding batch {i // batch_size + 1} ({len(batch)} chunks)...")
-
-        for chunk in batch:
-            embedding = embed_text(chunk["text"])
-            embeddings.append(embedding)
-
-        # Respect Gemini free tier rate limits
-        if i + batch_size < len(chunks):
-            time.sleep(1)
-
+        batch = [chunk["text"] for chunk in chunks[i : i + batch_size]]
+        response = requests.post(API_URL, headers=HEADERS, json={"inputs": batch})
+        batch_embeddings = response.json()
+        
+        # If HF returns an error (like model loading or bad API key), crash loudly with the real reason
+        if isinstance(batch_embeddings, dict) and "error" in batch_embeddings:
+            raise Exception(f"HuggingFace API Error: {batch_embeddings['error']}")
+            
+        embeddings.extend(batch_embeddings)
+        
     return embeddings
