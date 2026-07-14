@@ -35,3 +35,12 @@ code, pre { font-family: 'JetBrains Mono', monospace; }
   box-shadow: none !important;
 }
 .react-flow__node-default.selected { box-shadow: none !important; }
+
+@keyframes custom-progress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-progress {
+  animation: custom-progress 2s ease-in-out infinite;
+}

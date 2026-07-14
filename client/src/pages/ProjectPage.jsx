@@ -4,6 +4,7 @@ import axios from 'axios'
 import GraphPanel from '../components/GraphPanel.jsx'
 import NodeDrawer from '../components/NodeDrawer.jsx'
 import ChatPanel  from '../components/ChatPanel.jsx'
+import { UserButton } from '@clerk/clerk-react'
 
 const API = 'http://localhost:3000'
 
@@ -17,6 +18,7 @@ export default function ProjectPage() {
   const [highlightIds, setHighlightIds] = useState([])
   const [prefillQ, setPrefillQ]         = useState(null)
   const [loading, setLoading]           = useState(true)
+  const [isChatOpen, setIsChatOpen]     = useState(true)
 
   useEffect(() => {
     const init = async () => {
@@ -32,6 +34,26 @@ export default function ProjectPage() {
     }
     init()
   }, [id])
+
+  const handleFileClick = (filePath) => {
+    // Pinecone returns the absolute file path, which matches n.id in the graph
+    // We need to look up the node's data object for the NodeDrawer
+    const nodeObj = graphData.nodes.find(n => n.id === filePath);
+    
+    if (nodeObj) {
+      setSelectedNode(nodeObj.data);
+    } else {
+      // Fallback in case of path mismatches: match by trailing suffix
+      const normalizedQuery = filePath.replace(/\\/g, '/');
+      const fallback = graphData.nodes.find(n => n.id.replace(/\\/g, '/').endsWith(normalizedQuery));
+      if (fallback) {
+        setSelectedNode(fallback.data);
+      } else {
+        // Last resort fake object so drawer still opens
+        setSelectedNode({ full_path: filePath, label: normalizedQuery.split('/').pop() });
+      }
+    }
+  }
 
   if (loading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
@@ -63,6 +85,18 @@ export default function ProjectPage() {
               ✕ Clear highlights
             </button>
           )}
+          <button 
+            onClick={() => setIsChatOpen(!isChatOpen)}
+            className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors flex items-center gap-2 ${
+              isChatOpen 
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20' 
+                : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white hover:bg-zinc-700'
+            }`}
+          >
+            🤖 AI Chat {isChatOpen ? '· Open' : '· Closed'}
+          </button>
+          <div className="w-px h-6 bg-zinc-800 mx-2" />
+          <UserButton afterSignOutUrl="/" />
         </div>
       </nav>
 
@@ -79,13 +113,22 @@ export default function ProjectPage() {
 
         <NodeDrawer
           node={selectedNode}
+          projectId={id}
           onClose={() => setSelectedNode(null)}
-          onAskAI={(q) => { setSelectedNode(null); setPrefillQ(q) }}
+          onAskAI={(q) => { 
+            setSelectedNode(null); 
+            setPrefillQ(q);
+            setIsChatOpen(true); 
+          }}
         />
 
         <ChatPanel
           projectId={id}
+          initialMessages={project?.chat_history || []}
+          isOpen={isChatOpen}
+          onClose={() => setIsChatOpen(false)}
           onHighlight={setHighlightIds}
+          onFileClick={handleFileClick}
           prefillQuestion={prefillQ}
           onPrefillConsumed={() => setPrefillQ(null)}
         />

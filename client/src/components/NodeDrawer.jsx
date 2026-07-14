@@ -1,4 +1,11 @@
-export default function NodeDrawer({ node, onClose, onAskAI }) {
+import { useState, useEffect } from 'react'
+import axios from 'axios'
+import SyntaxHighlighter from 'react-syntax-highlighter'
+import { vs2015 } from 'react-syntax-highlighter/dist/esm/styles/hljs'
+
+const API = 'http://localhost:3000'
+
+export default function NodeDrawer({ node, projectId, onClose, onAskAI }) {
   if (!node) return null
 
   const pathParts = (node.full_path || '').replace(/\\/g, '/').split('/')
@@ -14,8 +21,20 @@ export default function NodeDrawer({ node, onClose, onAskAI }) {
     { label: 'Circular import', value: node.has_cycle ? '⚠️ Yes' : 'No' },
   ]
 
+  const [code, setCode] = useState('');
+  const [loadingCode, setLoadingCode] = useState(false);
+
+  useEffect(() => {
+    if (!node || !projectId) return;
+    setLoadingCode(true);
+    axios.get(`${API}/api/projects/${projectId}/file`, { params: { path: node.full_path } })
+      .then(res => setCode(res.data.source_code || '// No source code found for this file.'))
+      .catch(err => setCode('// Failed to load source code.'))
+      .finally(() => setLoadingCode(false));
+  }, [node, projectId]);
+
   return (
-    <div className="w-80 border-l border-zinc-800 bg-zinc-900 flex flex-col overflow-hidden shrink-0">
+    <div className="w-[550px] border-l border-zinc-800 bg-zinc-900 flex flex-col overflow-hidden shrink-0">
       <div className="flex items-start justify-between p-5 border-b border-zinc-800">
         <div className="min-w-0">
           <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-1">{folder}</p>
@@ -39,6 +58,24 @@ export default function NodeDrawer({ node, onClose, onAskAI }) {
           <p className="text-[11px] font-mono text-zinc-500 break-all leading-relaxed bg-black rounded-lg p-3">
             {node.full_path}
           </p>
+        </div>
+
+        <div className="mt-5">
+          <p className="text-[10px] text-zinc-600 uppercase tracking-widest mb-2">Source Code</p>
+          <div className="rounded-lg border border-zinc-800 bg-[#1e1e1e] overflow-hidden">
+            {loadingCode ? (
+              <div className="p-5 text-sm text-zinc-500 animate-pulse">Fetching source code...</div>
+            ) : (
+              <SyntaxHighlighter
+                language={node.language?.toLowerCase() === 'python' ? 'python' : 'javascript'}
+                style={vs2015}
+                customStyle={{ margin: 0, padding: '1rem', fontSize: '13px', background: 'transparent' }}
+                showLineNumbers={true}
+              >
+                {code}
+              </SyntaxHighlighter>
+            )}
+          </div>
         </div>
       </div>
 

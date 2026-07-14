@@ -40,7 +40,8 @@ class Neo4jClient:
             f.topo_order = $topo_order,
             f.in_degree = $in_degree,
             f.is_hub = $is_hub,
-            f.function_count = $function_count
+            f.function_count = $function_count,
+            f.source_code = $source_code
         """
         tx.run(query, 
                path=file_path, 
@@ -50,7 +51,8 @@ class Neo4jClient:
                topo_order=meta.get("topo_order", 0),
                in_degree=meta.get("in_degree", 0),
                is_hub=meta.get("is_hub", False),
-               function_count=meta.get("function_count", 0))
+               function_count=meta.get("function_count", 0),
+               source_code=meta.get("source_code", ""))
     
 
     @staticmethod
@@ -61,3 +63,15 @@ class Neo4jClient:
         MERGE (a)-[:IMPORTS]->(b)
         """
         tx.run(query, from_path=from_file, to_path=to_file, pid=project_id)
+
+    def delete_project_graph(self, project_id: str):
+        if not self.driver:
+            return
+        with self.driver.session() as session:
+            session.execute_write(self._delete_nodes, project_id)
+            print(f"Graph for project {project_id} deleted from Neo4j.")
+            
+    @staticmethod
+    def _delete_nodes(tx, project_id):
+        query = "MATCH (f:File {project_id: $pid}) DETACH DELETE f"
+        tx.run(query, pid=project_id)

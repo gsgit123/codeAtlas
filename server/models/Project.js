@@ -14,10 +14,30 @@ const projectSchema=new mongoose.Schema({
         type:Number,
         default:0
     },
+    progress_text: {
+        type: String,
+        default: ""
+    },
+    progress_percent: {
+        type: Number,
+        default: 0
+    },
+    summary: {
+        type: String,
+        default: ""
+    },
+    chat_history: {
+        type: Array,
+        default: []
+    },
     project_id:{
         type:String,
         required:true,
         unique:true
+    },
+    userId: {
+        type: String,
+        required: true
     }
 
 },

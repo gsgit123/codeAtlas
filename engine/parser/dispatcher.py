@@ -20,12 +20,16 @@ def process_project(project_path:str):
                 if file.endswith(('.js', '.jsx', '.ts', '.tsx')):
                     with open(file_path, 'rb') as f:
                         content = f.read()
-                    parsed_files.append(parse_javascript(content, file_path))
+                    data = parse_javascript(content, file_path)
+                    data["source_code"] = content.decode('utf-8', errors='replace')
+                    parsed_files.append(data)
                     
                 elif file.endswith('.py'):
                     with open(file_path, 'rb') as f:
                         content = f.read()
-                    parsed_files.append(parse_python(content, file_path))
+                    data = parse_python(content, file_path)
+                    data["source_code"] = content.decode('utf-8', errors='replace')
+                    parsed_files.append(data)
             
             except Exception as e:
                 print(f"Warning: Failed to parse {file_path}, Error: {e}")

@@ -51,7 +51,8 @@ def build_project_graph(parsed_files: list) -> DependencyGraph:
         all_paths.add(abs_path)
         metadata = {
             "language":       f.get("language", "unknown"),
-            "function_count": len(f.get("functions", []))
+            "function_count": len(f.get("functions", [])),
+            "source_code":    f.get("source_code", "")
         }
         graph.add_node(abs_path, metadata)
 

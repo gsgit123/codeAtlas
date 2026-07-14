@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+python-dotenv
+pydantic
+requests
+neo4j
+chromadb
+groq
+tree-sitter
+tree-sitter-javascript
+tree-sitter-python
+rank_bm25
+sentence-transformers
+numpy
+pinecone

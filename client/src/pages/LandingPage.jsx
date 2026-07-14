@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/clerk-react'
 
 const API = 'http://localhost:3000'
 
@@ -8,6 +9,7 @@ export default function LandingPage() {
   const [file, setFile]           = useState(null)
   const [status, setStatus]       = useState('idle')
   const [statusMsg, setStatusMsg] = useState('')
+  const [progressPercent, setProgressPercent] = useState(0)
   const [dragOver, setDragOver]   = useState(false)
   const fileInputRef              = useRef(null)
   const navigate                  = useNavigate()
@@ -25,17 +27,20 @@ export default function LandingPage() {
     const iv = setInterval(async () => {
       try {
         const res = await axios.get(`${API}/api/projects/${projectId}`)
-        const s   = res.data.status
-        if (s === 'ready') {
+        const data = res.data
+        if (data.status === 'ready') {
           clearInterval(iv); setStatus('done')
           setStatusMsg('Analysis complete! Redirecting...')
           setTimeout(() => navigate(`/project/${projectId}`), 1200)
-        } else if (s === 'error') {
+        } else if (data.status === 'error') {
           clearInterval(iv); setStatus('error')
-          setStatusMsg('Processing failed. Please try again.')
+          setStatusMsg(data.progress_text || 'Processing failed. Please try again.')
+        } else if (data.status === 'processing' && data.progress_text) {
+          setStatusMsg(data.progress_text)
+          if (data.progress_percent !== undefined) setProgressPercent(data.progress_percent)
         }
       } catch { clearInterval(iv); setStatus('error'); setStatusMsg('Server error.') }
-    }, 2000)
+    }, 1000)
   }
 
   const handleUpload = async () => {
@@ -68,10 +73,22 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="fixed top-0 left-0 right-0 flex justify-between items-center px-10 py-5 border-b border-zinc-800 bg-black/80 backdrop-blur-md z-50">
         <span className="text-xl font-black tracking-tight gradient-text">⬡ CodeAtlas</span>
-        <button onClick={() => navigate('/dashboard')}
-          className="text-sm font-medium text-zinc-400 border border-zinc-700 px-4 py-2 rounded-lg hover:border-emerald-500 hover:text-white transition-all">
-          My Projects →
-        </button>
+        <div className="flex items-center gap-4">
+          <SignedIn>
+            <button onClick={() => navigate('/dashboard')}
+              className="text-sm font-medium text-zinc-400 border border-zinc-700 px-4 py-2 rounded-lg hover:border-emerald-500 hover:text-white transition-all">
+              My Projects →
+            </button>
+            <UserButton afterSignOutUrl="/" />
+          </SignedIn>
+          <SignedOut>
+            <SignInButton mode="modal">
+              <button className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-all">
+                Sign In
+              </button>
+            </SignInButton>
+          </SignedOut>
+        </div>
       </nav>
 
       {/* Hero */}
@@ -91,58 +108,80 @@ export default function LandingPage() {
 
       {/* Upload Zone */}
       <div className="w-full max-w-lg fade-in">
-        <div
-          onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
-          onClick={() => !file && fileInputRef.current?.click()}
-          className={`border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer transition-all duration-300
-            ${dragOver
-              ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_40px_rgba(16,185,129,0.15)]'
-              : 'border-zinc-700 bg-zinc-900 hover:border-emerald-500 hover:bg-emerald-500/5'}`}
-        >
-          <input ref={fileInputRef} type="file" accept=".zip" className="hidden" onChange={e => setFile(e.target.files[0])} />
-          {file ? (
-            <div>
-              <div className="text-4xl mb-3">📦</div>
-              <p className="font-semibold text-base mb-1">{file.name}</p>
-              <p className="text-zinc-500 text-sm mb-4">{(file.size / 1024).toFixed(1)} KB</p>
-              <button onClick={e => { e.stopPropagation(); setFile(null) }}
-                className="text-xs border border-zinc-700 text-zinc-400 px-3 py-1.5 rounded-md hover:border-zinc-500">
-                Remove
-              </button>
-            </div>
-          ) : (
-            <div>
-              <div className="text-5xl mb-4">⬆️</div>
-              <p className="font-semibold text-base mb-2">Drop your repository ZIP here</p>
-              <p className="text-zinc-500 text-sm">or click to browse files</p>
-            </div>
-          )}
-        </div>
-
-        {file && status === 'idle' && (
-          <button onClick={handleUpload}
-            className="w-full mt-4 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-semibold rounded-xl transition-all text-base">
-            Analyse Repository →
-          </button>
-        )}
-
-        {status !== 'idle' && (
-          <div className="mt-5 p-5 bg-zinc-900 border border-zinc-800 rounded-xl">
-            <div className="flex items-center gap-3">
-              {(status === 'uploading' || status === 'processing') && (
-                <div className={`w-2 h-2 rounded-full pulse-dot ${status === 'uploading' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
-              )}
-              {status === 'done'  && <span>✅</span>}
-              {status === 'error' && <span>❌</span>}
-              <span className={`font-semibold text-sm ${statusColor[status]}`}>{statusMsg}</span>
-            </div>
-            {status === 'processing' && (
-              <p className="text-zinc-600 text-xs mt-3 leading-relaxed">
-                This may take 20–60s depending on codebase size.
-              </p>
+        <SignedIn>
+          <div
+            onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
+            onClick={() => !file && fileInputRef.current?.click()}
+            className={`border-2 border-dashed rounded-2xl p-16 text-center cursor-pointer transition-all duration-300
+              ${dragOver
+                ? 'border-emerald-500 bg-emerald-500/10 shadow-[0_0_40px_rgba(16,185,129,0.15)]'
+                : 'border-zinc-700 bg-zinc-900 hover:border-emerald-500 hover:bg-emerald-500/5'}`}
+          >
+            <input ref={fileInputRef} type="file" accept=".zip" className="hidden" onChange={e => setFile(e.target.files[0])} />
+            {file ? (
+              <div>
+                <div className="text-4xl mb-3">📦</div>
+                <p className="font-semibold text-base mb-1">{file.name}</p>
+                <p className="text-zinc-500 text-sm mb-4">{(file.size / 1024).toFixed(1)} KB</p>
+                <button onClick={e => { e.stopPropagation(); setFile(null) }}
+                  className="text-xs border border-zinc-700 text-zinc-400 px-3 py-1.5 rounded-md hover:border-zinc-500">
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div className="text-5xl mb-4">⬆️</div>
+                <p className="font-semibold text-base mb-2">Drop your repository ZIP here</p>
+                <p className="text-zinc-500 text-sm">or click to browse files</p>
+              </div>
             )}
           </div>
-        )}
+
+          {file && status === 'idle' && (
+            <button onClick={handleUpload}
+              className="w-full mt-4 py-4 bg-emerald-600 hover:bg-emerald-500 active:scale-[0.99] text-white font-semibold rounded-xl transition-all text-base">
+              Analyse Repository →
+            </button>
+          )}
+
+          {status !== 'idle' && (
+            <div className="mt-5 p-5 bg-zinc-900 border border-zinc-800 rounded-xl">
+              <div className="flex items-center gap-3">
+                {(status === 'uploading' || status === 'processing') && (
+                  <div className={`w-2 h-2 rounded-full pulse-dot ${status === 'uploading' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                )}
+                {status === 'done'  && <span>✅</span>}
+                {status === 'error' && <span>❌</span>}
+                <span className={`font-semibold text-sm ${statusColor[status]}`}>{statusMsg}</span>
+              </div>
+              {status === 'processing' && (
+                <>
+                  <p className="text-zinc-600 text-xs mt-3 mb-2 leading-relaxed">
+                    This may take 20–60s depending on codebase size.
+                  </p>
+                  <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden relative mt-4">
+                    <div 
+                      className="absolute h-full bg-emerald-500 shadow-[0_0_10px_#10b981] transition-all duration-700 ease-out" 
+                      style={{ width: `${progressPercent || 5}%` }} 
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </SignedIn>
+
+        <SignedOut>
+          <div className="border border-zinc-800 rounded-2xl p-10 text-center bg-zinc-900/50">
+            <h3 className="text-xl font-bold mb-3">Sign in to start analysing</h3>
+            <p className="text-zinc-500 mb-6 text-sm">Create a free account to upload your repositories and access the AI chat.</p>
+            <SignInButton mode="modal">
+              <button className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-3 rounded-xl transition-all w-full">
+                Get Started
+              </button>
+            </SignInButton>
+          </div>
+        </SignedOut>
       </div>
 
       {/* Pills */}

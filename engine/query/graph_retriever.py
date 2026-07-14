@@ -160,3 +160,18 @@ def get_reactflow_graph(project_id: str) -> dict:
         print("[graph_retriever] Neo4j is unavailable. Check your Aura dashboard and resume the database.")
         return {"nodes": [], "edges": [], "error": "Neo4j database is paused or unreachable. Please resume it from console.neo4j.io and refresh."}
 
+
+def get_file_content(project_id: str, file_path: str) -> dict:
+    try:
+        with driver.session() as session:
+            result = session.run("""
+                MATCH (f:File {project_id: $pid, path: $path})
+                RETURN f.source_code AS source_code
+            """, pid=project_id, path=file_path)
+            record = result.single()
+            if record:
+                return {"source_code": record["source_code"]}
+            return {"error": "File not found in graph"}
+    except Exception as e:
+        print(f"Failed to fetch file content: {e}")
+        return {"error": "Failed to fetch file content"}

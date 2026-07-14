@@ -88,25 +88,7 @@ def parse_citations(answer: str) -> tuple:
     return files_used, nodes_used
 
 
-def detect_mentioned_files(question: str, all_chunks: list) -> list:
-    """If the question mentions a specific filename, return chunks from that file first."""
-    # Find all word-like tokens that look like filenames (contain a dot + extension)
-    tokens = re.findall(r'[\w\-]+\.\w+', question)
-    if not tokens:
-        return []
-
-    boosted = []
-    for token in tokens:
-        token_lower = token.lower()
-        for chunk in all_chunks:
-            file_path = chunk.get("file", "").replace("\\", "/").lower()
-            if file_path.endswith(token_lower):
-                if chunk not in boosted:
-                    boosted.append(chunk)
-
-    if boosted:
-        print(f"  [Engine] Filename boost: found {len(boosted)} chunks for {tokens}")
-    return boosted
+# detect_mentioned_files removed because Pinecone does not support dumping the DB.
 
 
 #full query
@@ -126,41 +108,9 @@ def run_query(project_id:str,question:str):
 
     #rag retrieval
     collection=get_or_create_collection(project_id)
-    all_results=collection.get(include=["metadatas","documents"])
-    all_chunks=[
-        {
-            "text":       all_results["documents"][i],
-            "file":       all_results["metadatas"][i].get("file", ""),
-            "name":       all_results["metadatas"][i].get("name", ""),
-            "type":       all_results["metadatas"][i].get("type", ""),
-            "start_line": all_results["metadatas"][i].get("start_line", 0),
-            "end_line":   all_results["metadatas"][i].get("end_line", 0),
-            "language":   all_results["metadatas"][i].get("language", ""),
-            "project_id": all_results["metadatas"][i].get("project_id", "")
-        }
-        for i in range(len(all_results["documents"]))
-    ]
 
-    # --- FIX 3: Detect filename mentions and boost those chunks ---
-    filename_chunks = detect_mentioned_files(question, all_chunks)
-
-    # Standard hybrid retrieval
-    rag_chunks = retrieve(question, collection, all_chunks, top_k=5)
-
-    # Merge: filename-specific chunks first, then semantic results (deduplicated)
-    if filename_chunks:
-        seen_files = set(c["file"] for c in filename_chunks)
-        semantic_extras = [c for c in rag_chunks if c["metadata"]["file"] not in seen_files]
-        # Convert filename_chunks to retriever format
-        filename_hits = [{
-            "text": c["text"],
-            "metadata": {
-                "file": c["file"], "name": c["name"], "type": c["type"],
-                "start_line": c["start_line"], "end_line": c["end_line"],
-                "language": c["language"], "project_id": c["project_id"]
-            }
-        } for c in filename_chunks[:3]]
-        rag_chunks = filename_hits + semantic_extras[:3]
+    # Standard dense vector retrieval via Pinecone
+    rag_chunks = retrieve(question, collection, top_k=5)
 
     #graph retrieval
     graph_context=""

@@ -11,12 +11,18 @@ const ROUTE_COLORS = {
   trace:      { bg: 'bg-purple-500/10',  text: 'text-purple-400',  border: 'border-purple-500/30' },
 }
 
-export default function ChatPanel({ projectId, onHighlight, prefillQuestion, onPrefillConsumed }) {
-  const [messages, setMessages] = useState([])
+export default function ChatPanel({ projectId, initialMessages = [], isOpen = true, onClose, onHighlight, onFileClick, prefillQuestion, onPrefillConsumed }) {
+  const [messages, setMessages] = useState(initialMessages)
   const [input, setInput]       = useState('')
   const [loading, setLoading]   = useState(false)
   const bottomRef               = useRef(null)
   const inputRef                = useRef(null)
+
+  useEffect(() => {
+    if (initialMessages && initialMessages.length > 0 && messages.length === 0) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
 
   useEffect(() => {
     if (prefillQuestion) {
@@ -54,16 +60,29 @@ export default function ChatPanel({ projectId, onHighlight, prefillQuestion, onP
   }
 
   return (
-    <div className="w-96 border-l border-zinc-800 bg-zinc-900 flex flex-col overflow-hidden shrink-0">
+    <div 
+      className={`bg-zinc-900 flex flex-col overflow-hidden shrink-0 h-full transition-all duration-300 ease-in-out border-zinc-800 ${
+        isOpen ? 'w-96 opacity-100 border-l' : 'w-0 opacity-0 border-l-0'
+      }`}
+    >
+      <div className="w-96 flex flex-col h-full shrink-0">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-zinc-800 flex justify-between items-start shrink-0">
+          <div>
+            <h2 className="text-sm font-bold text-white">🤖 AI Chat</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">Ask anything about this codebase</p>
+          </div>
+          <button 
+            onClick={onClose}
+            className="text-zinc-500 hover:text-white transition-colors p-1"
+            title="Close Chat"
+          >
+            ✕
+          </button>
+        </div>
 
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-zinc-800">
-        <h2 className="text-sm font-bold text-white">🤖 AI Chat</h2>
-        <p className="text-xs text-zinc-500 mt-0.5">Ask anything about this codebase</p>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
 
         {messages.length === 0 && !loading && (
           <div className="flex flex-col items-center text-center py-10">
@@ -126,9 +145,14 @@ export default function ChatPanel({ projectId, onHighlight, prefillQuestion, onP
                 {msg.files_used?.length > 0 && (
                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                     {msg.files_used.map(f => (
-                      <span key={f} className="text-[10px] bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-1 rounded-md font-mono">
+                      <button 
+                        key={f} 
+                        onClick={() => onFileClick(f)}
+                        className="cursor-pointer text-[10px] bg-emerald-500/10 hover:bg-emerald-500/20 hover:scale-105 border border-emerald-500/30 text-emerald-400 px-2 py-1 rounded-md font-mono transition-all"
+                        title="Click to view source code"
+                      >
                         📄 {f.replace(/\\/g, '/').split('/').at(-1)}
-                      </span>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -151,24 +175,24 @@ export default function ChatPanel({ projectId, onHighlight, prefillQuestion, onP
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t border-zinc-800">
-        <div className="flex gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask about your code..."
-            rows={2}
-            className="flex-1 bg-zinc-800 border border-zinc-700 focus:border-emerald-500 text-white text-sm placeholder-zinc-500 rounded-xl px-3 py-2.5 resize-none outline-none transition-colors"
-          />
-          <button onClick={sendMessage} disabled={!input.trim() || loading}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all font-medium text-sm self-end">
-            ↑
-          </button>
+        <div className="p-4 border-t border-zinc-800 shrink-0">
+          <div className="flex gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about your code..."
+              rows={2}
+              className="flex-1 bg-zinc-800 border border-zinc-700 focus:border-emerald-500 text-white text-sm placeholder-zinc-500 rounded-xl px-3 py-2.5 resize-none outline-none transition-colors"
+            />
+            <button onClick={sendMessage} disabled={!input.trim() || loading}
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-all font-medium text-sm self-end">
+              ↑
+            </button>
+          </div>
+          <p className="text-zinc-600 text-[10px] mt-2 text-center">Enter to send · Shift+Enter for new line</p>
         </div>
-        <p className="text-zinc-600 text-[10px] mt-2 text-center">Enter to send · Shift+Enter for new line</p>
       </div>
     </div>
   )
