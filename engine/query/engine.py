@@ -11,28 +11,48 @@ from rag.retriever import retrieve
 from rag.embedder import embed_text
 from rag.vector_store import get_or_create_collection
 
+import redis
+
 load_dotenv()
 groq_client=Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-#cache
-_cache=[]
+raw_url = os.getenv("REDIS_URL")
+clean_url = raw_url.split("?")[0] if "?" in raw_url else raw_url
+redis_client = redis.from_url(clean_url, decode_responses=True, ssl_cert_reqs="none")
+
 CACHE_LIMIT=50
 CACHE_THRESHOLD=0.93
+
 def cosine_similarity(a:list,b:list)->float:
     a,b=np.array(a),np.array(b)
     return float(np.dot(a,b)/(np.linalg.norm(a)*np.linalg.norm(b)))
 
-def cache_lookup(query_vector:list):
-    for vec,answer in _cache:
-        if cosine_similarity(query_vector,vec)>CACHE_THRESHOLD:
-            print("[Cache] Cache hit! Returning cached answer.")
-            return answer
+def cache_lookup(project_id: str, query_vector: list):
+    cache_key = f"codeatlas_cache:{project_id}"
+    cached_items = redis_client.lrange(cache_key, 0, -1)
+    
+    for item_str in cached_items:
+        try:
+            item = json.loads(item_str)
+            if cosine_similarity(query_vector, item["vector"]) > CACHE_THRESHOLD:
+                print("[Cache] Redis Cache Hit! Returning instant answer.")
+                return item["answer"]
+        except:
+            continue
     return None
 
-def cache_store(query_vector:list,answer:str):
-    if(len(_cache)>=CACHE_LIMIT):
-        _cache.pop(0)
-    _cache.append((query_vector,answer))
+def cache_store(project_id: str, query_vector: list, answer: dict):
+    cache_key = f"codeatlas_cache:{project_id}"
+    item = json.dumps({
+        "vector": query_vector,
+        "answer": answer
+    })
+    
+    # Push to list and trim to maintain limit
+    redis_client.lpush(cache_key, item)
+    redis_client.ltrim(cache_key, 0, CACHE_LIMIT - 1)
+    # Expire cache after 24 hours to keep Redis clean
+    redis_client.expire(cache_key, 86400)
 
 
 PROMPT_TEMPLATE = """You are CodeAtlas, an expert AI code analyst. 
@@ -96,10 +116,11 @@ def run_query(project_id:str,question:str):
     print(f"\n========== New Query ==========")
     print(f"Question: {question}")
 
-    #check cache
+    #check redis cache
     query_vector=embed_text(question)
-    cached=cache_lookup(query_vector)
+    cached=cache_lookup(project_id, query_vector)
     if cached:
+        cached["is_cached"] = True
         return cached
 
     #classify question
@@ -154,9 +175,10 @@ def run_query(project_id:str,question:str):
         "answer":     answer,
         "files_used": files_used,
         "nodes_used": nodes_used,
-        "chunks_used": len(rag_chunks)
+        "chunks_used": len(rag_chunks),
+        "is_cached":  False
     }
-    cache_store(query_vector, result)
+    cache_store(project_id, query_vector, result)
     return result
 
 
