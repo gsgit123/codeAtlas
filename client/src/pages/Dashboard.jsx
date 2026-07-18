@@ -4,11 +4,11 @@ import axios from 'axios'
 import { UserButton, useAuth } from '@clerk/clerk-react'
 import io from 'socket.io-client'
 
-const API = 'http://localhost:3000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 function StatusBadge({ status }) {
   const map = {
-    ready:      { label: 'Ready',      cls: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' },
+    ready:      { label: 'Ready',      cls: 'bg-orange-500/10 text-orange-400 border-orange-500/30' },
     processing: { label: 'Processing', cls: 'bg-amber-500/10  text-amber-400  border-amber-500/30'  },
     error:      { label: 'Error',      cls: 'bg-red-500/10    text-red-400    border-red-500/30'    },
   }
@@ -84,13 +84,13 @@ export default function Dashboard() {
   }, [userId])
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-neutral-950 text-white">
 
-      <nav className="flex justify-between items-center px-10 py-5 border-b border-zinc-800">
+      <nav className="flex justify-between items-center px-10 py-5 border-b border-neutral-800">
         <span onClick={() => navigate('/')} className="text-xl font-black tracking-tight gradient-text cursor-pointer">⬡ CodeAtlas</span>
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/')}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-all">
+            className="bg-orange-600 hover:bg-orange-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition-all">
             + New Project
           </button>
           <UserButton afterSignOutUrl="/" />
@@ -100,12 +100,12 @@ export default function Dashboard() {
       <div className="max-w-5xl mx-auto px-6 py-14">
         <div className="mb-10">
           <h1 className="text-4xl font-black mb-2 tracking-tight">My Projects</h1>
-          <p className="text-zinc-500 text-sm">{projects.length} repositor{projects.length === 1 ? 'y' : 'ies'} analysed</p>
+          <p className="text-neutral-500 text-sm">{projects.length} repositor{projects.length === 1 ? 'y' : 'ies'} analysed</p>
         </div>
 
         {loading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[1,2,3].map(i => <div key={i} className="h-44 rounded-2xl bg-zinc-900 border border-zinc-800 animate-pulse" />)}
+            {[1,2,3].map(i => <div key={i} className="h-44 rounded-2xl bg-neutral-900 border border-neutral-800 animate-pulse" />)}
           </div>
         )}
 
@@ -113,9 +113,9 @@ export default function Dashboard() {
           <div className="text-center py-24">
             <div className="text-6xl mb-5">🗂️</div>
             <h3 className="text-2xl font-bold mb-3">No projects yet</h3>
-            <p className="text-zinc-500 mb-8">Upload a ZIP to analyse your first repository</p>
+            <p className="text-neutral-500 mb-8">Upload a ZIP to analyse your first repository</p>
             <button onClick={() => navigate('/')}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-3 rounded-xl transition-all">
+              className="bg-orange-600 hover:bg-orange-500 text-white font-semibold px-6 py-3 rounded-xl transition-all">
               Upload your first repo →
             </button>
           </div>
@@ -126,14 +126,14 @@ export default function Dashboard() {
             {projects.map(p => (
               <div key={p._id}
                 onClick={() => p.status === 'ready' && navigate(`/project/${p.project_id}`)}
-                className={`bg-zinc-900 border border-zinc-800 rounded-2xl p-7 flex flex-col gap-5 transition-all duration-200
+                className={`bg-neutral-900 border border-neutral-800 rounded-2xl p-7 flex flex-col gap-5 transition-all duration-200
                   ${p.status === 'ready'
-                    ? 'cursor-pointer hover:border-emerald-500 hover:bg-zinc-800/60 hover:shadow-[0_0_30px_rgba(16,185,129,0.1)]'
+                    ? 'cursor-pointer hover:border-orange-500 hover:bg-neutral-800/60 hover:shadow-[0_0_30px_rgba(249,115,22,0.1)]'
                     : 'cursor-default'}`}
               >
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest mb-1">Repository</p>
+                    <p className="text-[10px] font-mono text-neutral-600 uppercase tracking-widest mb-1">Repository</p>
                     <h3 className="text-lg font-bold text-white">{p.name}</h3>
                   </div>
                   <div className="flex gap-2 items-center">
@@ -141,11 +141,11 @@ export default function Dashboard() {
                     <button 
                       onClick={(e) => promptDelete(p, e)}
                       disabled={deletingId === p.project_id}
-                      className="p-1.5 rounded bg-zinc-800/50 hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="p-1.5 rounded bg-neutral-800/50 hover:bg-red-500/20 text-neutral-500 hover:text-red-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Delete Project"
                     >
                       {deletingId === p.project_id ? (
-                        <div className="w-3.5 h-3.5 rounded-full border-2 border-zinc-500 border-t-zinc-300 animate-spin" />
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-neutral-500 border-t-neutral-300 animate-spin" />
                       ) : (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6"/></svg>
                       )}
@@ -154,34 +154,34 @@ export default function Dashboard() {
                 </div>
 
                 {p.summary && (
-                  <p className="text-xs text-zinc-400 leading-relaxed font-medium bg-zinc-950/50 p-3 rounded-xl border border-zinc-800/50">
+                  <p className="text-xs text-neutral-400 leading-relaxed font-medium bg-neutral-950/50 p-3 rounded-xl border border-neutral-800/50">
                     ✨ {p.summary}
                   </p>
                 )}
 
                 <div className="flex gap-6 mt-auto">
                   <div>
-                    <p className="text-2xl font-black text-emerald-400">{p.file_count}</p>
-                    <p className="text-xs text-zinc-500">files</p>
+                    <p className="text-2xl font-black text-orange-400">{p.file_count}</p>
+                    <p className="text-xs text-neutral-500">files</p>
                   </div>
-                  <div className="w-px bg-zinc-800" />
+                  <div className="w-px bg-neutral-800" />
                   <div>
                     <p className="text-2xl font-black text-white">{timeAgo(p.createdAt)}</p>
-                    <p className="text-xs text-zinc-500">uploaded</p>
+                    <p className="text-xs text-neutral-500">uploaded</p>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2 pt-4 border-t border-zinc-800">
+                <div className="flex flex-col gap-2 pt-4 border-t border-neutral-800">
                   <div className="flex justify-between items-center">
-                    <span className="font-mono text-[11px] text-zinc-600">{p.project_id.slice(0, 8)}...</span>
-                    {p.status === 'ready'      && <span className="text-sm text-emerald-400 font-semibold">Open →</span>}
+                    <span className="font-mono text-[11px] text-neutral-600">{p.project_id.slice(0, 8)}...</span>
+                    {p.status === 'ready'      && <span className="text-sm text-orange-400 font-semibold">Open →</span>}
                     {p.status === 'processing' && <span className="text-xs text-amber-400">{p.progress_text || 'Analysing...'}</span>}
                     {p.status === 'error'      && <span className="text-xs text-red-500">{p.progress_text || 'Failed'}</span>}
                   </div>
                   {p.status === 'processing' && (
-                    <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden mt-1 relative">
+                    <div className="w-full h-1 bg-neutral-800 rounded-full overflow-hidden mt-1 relative">
                       <div 
-                        className="absolute h-full bg-emerald-500 shadow-[0_0_10px_#10b981] transition-all duration-700 ease-out" 
+                        className="absolute h-full bg-orange-500 shadow-[0_0_10px_#f97316] transition-all duration-700 ease-out" 
                         style={{ width: `${p.progress_percent || 5}%` }} 
                       />
                     </div>
@@ -195,17 +195,17 @@ export default function Dashboard() {
 
       {/* Custom Delete Confirmation Modal */}
       {projectToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-7 max-w-sm w-full shadow-2xl fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-950/60 backdrop-blur-sm px-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-7 max-w-sm w-full shadow-2xl fade-in">
             <h3 className="text-xl font-bold text-white mb-2">Delete Project?</h3>
-            <p className="text-zinc-400 text-sm mb-6 leading-relaxed">
-              Are you sure you want to delete <span className="text-emerald-400 font-semibold">{projectToDelete.name}</span>? 
+            <p className="text-neutral-400 text-sm mb-6 leading-relaxed">
+              Are you sure you want to delete <span className="text-orange-400 font-semibold">{projectToDelete.name}</span>? 
               This will permanently wipe all graph nodes and vector embeddings. This action cannot be undone.
             </p>
             <div className="flex justify-end gap-3">
               <button 
                 onClick={() => setProjectToDelete(null)}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-zinc-300 hover:text-white hover:bg-zinc-800 transition-colors"
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors"
               >
                 Cancel
               </button>

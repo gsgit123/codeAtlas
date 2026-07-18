@@ -32,24 +32,53 @@ celery_app.conf.update(
 
 neo4j_client = Neo4jClient()
 
-def update_status(project_id: str, status: str = None, text: str = None, percent: int = None, summary: str = None):
+def update_status(project_id: str, status: str = None, text: str = None, percent: int = None, summary: str = None, file_count: int = None):
     node_url = os.getenv("NODE_URL", "http://localhost:3000")
     payload = {}
     if status: payload["status"] = status
     if text: payload["progress_text"] = text
     if percent is not None: payload["progress_percent"] = percent
     if summary is not None: payload["summary"] = summary
+    if file_count is not None: payload["file_count"] = file_count
     try:
         requests.patch(f"{node_url}/api/projects/{project_id}/status", json=payload)
     except Exception as e:
         print("Failed to update Node server:", e)
 
+import subprocess
+
 @celery_app.task(name="tasks.run_parsing_pipeline")
 def run_parsing_pipeline_task(project_id: str, folder_path: str):
+    execute_pipeline(project_id, folder_path)
+
+@celery_app.task(name="tasks.run_github_parsing_pipeline")
+def run_github_parsing_pipeline_task(project_id: str, repo_url: str):
+    folder_path = os.path.abspath(f"temp_github_{project_id}")
+    try:
+        print(f"[0/4] Cloning GitHub repository: {repo_url}...")
+        update_status(project_id, text="Cloning GitHub repository...", percent=10)
+        
+        result = subprocess.run(["git", "clone", "--depth", "1", repo_url, folder_path], capture_output=True, text=True)
+        if result.returncode != 0:
+            raise Exception(f"Git clone failed: {result.stderr}")
+            
+        execute_pipeline(project_id, folder_path)
+    except Exception as e:
+        print(f"GitHub Pipeline Failed: {str(e)}")
+        update_status(project_id, status="error", text=f"Error: {str(e)}")
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path)
+
+def execute_pipeline(project_id: str, folder_path: str):
     try:
         print(f"[1/4] Parsing files for {project_id}...")
         update_status(project_id, text="Parsing files and extracting source code...", percent=25)
         parsed_data = process_project(folder_path)
+        
+        # Determine file count and update DB
+        file_count = len(parsed_data) if isinstance(parsed_data, list) else len(parsed_data.get("files", [])) if isinstance(parsed_data, dict) else 0
+        if file_count > 0:
+            update_status(project_id, file_count=file_count)
 
         print("[2/4] Building Dependency Graph...")
         update_status(project_id, text="Building Neo4j dependency graph...", percent=50)
@@ -99,7 +128,11 @@ def run_parsing_pipeline_task(project_id: str, folder_path: str):
     finally:
         if os.path.exists(folder_path):
             try:
-                shutil.rmtree(folder_path)
+                import stat
+                def remove_readonly(func, path, _):
+                    os.chmod(path, stat.S_IWRITE)
+                    func(path)
+                shutil.rmtree(folder_path, onerror=remove_readonly)
                 print(f"[Cleanup] Deleted extracted folder: {folder_path}")
             except Exception as cleanup_err:
                 print(f"[Cleanup] Failed to delete {folder_path}: {cleanup_err}")

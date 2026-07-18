@@ -8,7 +8,7 @@ body {
 code, pre { font-family: 'JetBrains Mono', monospace; }
 
 .gradient-text {
-  background: linear-gradient(135deg, #6ee7b7, #10b981, #34d399);
+  background: linear-gradient(135deg, #fca5a5, #f97316, #fbbf24);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;

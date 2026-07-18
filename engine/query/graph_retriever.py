@@ -5,7 +5,9 @@ from dotenv import load_dotenv
 load_dotenv()
 driver = GraphDatabase.driver(
     os.getenv("NEO4J_URI"),
-    auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD"))
+    auth=(os.getenv("NEO4J_USERNAME", "neo4j"), os.getenv("NEO4J_PASSWORD")),
+    max_connection_lifetime=200,
+    keep_alive=True
 )
 
 

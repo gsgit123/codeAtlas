@@ -10,7 +10,7 @@ from query.graph_retriever import impact_query, trace_query, structural_query, g
 from rag.retriever import retrieve
 from query.engine import run_query
 
-from tasks import run_parsing_pipeline_task
+from tasks import run_parsing_pipeline_task, run_github_parsing_pipeline_task
 
 load_dotenv()
 app=FastAPI()
@@ -19,6 +19,10 @@ neo4j_client=Neo4jClient()
 class ParseRequest(BaseModel):
     project_id:str
     folder_path:str
+
+class GithubParseRequest(BaseModel):
+    project_id: str
+    repo_url: str
 
 class QueryRequest(BaseModel):
     project_id:str
@@ -40,6 +44,11 @@ def read_root():
 def trigger_parsing(request:ParseRequest):
     run_parsing_pipeline_task.delay(request.project_id, request.folder_path)
     return {"message": "Parsing pipeline queued successfully in Celery worker"}
+
+@app.post("/api/parse-github")
+def trigger_github_parsing(request:GithubParseRequest):
+    run_github_parsing_pipeline_task.delay(request.project_id, request.repo_url)
+    return {"message": "GitHub cloning & parsing pipeline queued successfully in Celery worker"}
 
 @app.get("/api/test-chroma/{project_id}")
 def test_chroma(project_id: str):

@@ -14,7 +14,12 @@ class Neo4jClient:
             print("NEO4J credentials missing in engine/.env")
             self.driver=None
         else:
-            self.driver=GraphDatabase.driver(uri,auth=(user,password))
+            self.driver=GraphDatabase.driver(
+                uri,
+                auth=(user, password),
+                max_connection_lifetime=200,
+                keep_alive=True
+            )
     
     def close(self):
         if self.driver:

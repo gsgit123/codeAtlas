@@ -6,7 +6,7 @@ import NodeDrawer from '../components/NodeDrawer.jsx'
 import ChatPanel  from '../components/ChatPanel.jsx'
 import { UserButton } from '@clerk/clerk-react'
 
-const API = 'http://localhost:3000'
+const API = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 
 export default function ProjectPage() {
   const { id }   = useParams()
@@ -56,32 +56,32 @@ export default function ProjectPage() {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
+    <div className="min-h-screen bg-neutral-950 flex items-center justify-center">
       <div className="text-center">
-        <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-zinc-400 text-sm">Loading project...</p>
+        <div className="w-10 h-10 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+        <p className="text-neutral-400 text-sm">Loading project...</p>
       </div>
     </div>
   )
 
   return (
-    <div className="h-screen bg-black text-white flex flex-col">
+    <div className="h-screen bg-neutral-950 text-white flex flex-col">
 
       {/* Nav */}
-      <nav className="flex items-center gap-4 px-6 py-4 border-b border-zinc-800 shrink-0">
+      <nav className="flex items-center gap-4 px-6 py-4 border-b border-neutral-800 shrink-0">
         <span onClick={() => navigate('/dashboard')}
           className="text-lg font-black tracking-tight gradient-text cursor-pointer">
           ⬡ CodeAtlas
         </span>
-        <span className="text-zinc-700">›</span>
-        <span className="text-zinc-300 font-semibold">{project?.name || id}</span>
-        <div className="ml-auto flex items-center gap-4 text-xs text-zinc-500">
+        <span className="text-neutral-700">›</span>
+        <span className="text-neutral-300 font-semibold">{project?.name || id}</span>
+        <div className="ml-auto flex items-center gap-4 text-xs text-neutral-500">
           <span>{graphData.nodes.length} files</span>
           <span>·</span>
           <span>{graphData.edges.length} imports</span>
           {highlightIds.length > 0 && (
             <button onClick={() => setHighlightIds([])}
-              className="text-emerald-400 hover:text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-md transition-colors">
+              className="text-orange-400 hover:text-orange-300 border border-orange-500/30 px-2 py-0.5 rounded-md transition-colors">
               ✕ Clear highlights
             </button>
           )}
@@ -89,13 +89,13 @@ export default function ProjectPage() {
             onClick={() => setIsChatOpen(!isChatOpen)}
             className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors flex items-center gap-2 ${
               isChatOpen 
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/20' 
-                : 'bg-zinc-800 text-zinc-400 border-zinc-700 hover:text-white hover:bg-zinc-700'
+                ? 'bg-orange-500/10 text-orange-400 border-orange-500/30 hover:bg-orange-500/20' 
+                : 'bg-neutral-800 text-neutral-400 border-neutral-700 hover:text-white hover:bg-neutral-700'
             }`}
           >
             🤖 AI Chat {isChatOpen ? '· Open' : '· Closed'}
           </button>
-          <div className="w-px h-6 bg-zinc-800 mx-2" />
+          <div className="w-px h-6 bg-neutral-800 mx-2" />
           <UserButton afterSignOutUrl="/" />
         </div>
       </nav>
@@ -135,11 +135,11 @@ export default function ProjectPage() {
       </div>
 
       {/* Legend */}
-      <div className="shrink-0 px-6 py-3 border-t border-zinc-800 flex gap-6 text-xs text-zinc-500">
+      <div className="shrink-0 px-6 py-3 border-t border-neutral-800 flex gap-6 text-xs text-neutral-500">
         <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-amber-400" /> Hub file</span>
         <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-red-500" /> Circular import</span>
-        <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-emerald-500" /> Highlighted by AI</span>
-        <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-zinc-600" /> Normal file</span>
+        <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-orange-500" /> Highlighted by AI</span>
+        <span className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-neutral-600" /> Normal file</span>
       </div>
     </div>
   )

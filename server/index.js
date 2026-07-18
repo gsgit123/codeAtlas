@@ -98,6 +98,38 @@ app.post("/api/upload", ClerkExpressRequireAuth(), upload.single("repo"), async(
     }
 });
 
+app.post("/api/github-import", ClerkExpressRequireAuth(), async(req,res)=>{
+    try{
+        const { repo_url } = req.body;
+        if(!repo_url) return res.status(400).json({error:"No repo_url provided"});
+        
+        const projectId=crypto.randomUUID();
+        // Extract project name from GitHub URL
+        const repoName = repo_url.split('/').pop().replace('.git', '');
+        
+        const project=new Project({
+            name: repoName,
+            project_id: projectId,
+            status: "processing",
+            file_count: 0, // Will be updated by engine later
+            userId: req.auth.userId
+        });
+
+        await project.save();
+        const engineUrl = process.env.ENGINE_URL || "http://localhost:8000";
+        
+        axios.post(`${engineUrl}/api/parse-github`, {
+            project_id: projectId,
+            repo_url: repo_url
+        }).catch(err => console.log("failed to trigger python engine", err.message));
+        
+        res.json({ message: "GitHub import queued", project_id: projectId, status: "processing" });
+    }catch(error){
+        console.error("GitHub import error:",error);
+        res.status(500).json({error:"Import failed"});
+    }
+});
+
 app.get("/api/projects", ClerkExpressRequireAuth(), async (req, res) => {
     const projects = await Project.find({ userId: req.auth.userId }).sort({ createdAt: -1 });
     res.json(projects);
@@ -127,12 +159,13 @@ app.delete("/api/projects/:id", ClerkExpressRequireAuth(), async (req, res) => {
 
 app.patch("/api/projects/:id/status",async(req,res)=>{
     try{
-        const {status, progress_text, progress_percent, summary}=req.body;
+        const {status, progress_text, progress_percent, summary, file_count}=req.body;
         const updateData = {};
         if (status) updateData.status = status;
         if (progress_text !== undefined) updateData.progress_text = progress_text;
         if (progress_percent !== undefined) updateData.progress_percent = progress_percent;
         if (summary !== undefined) updateData.summary = summary;
+        if (file_count !== undefined) updateData.file_count = file_count;
 
         const project=await Project.findOneAndUpdate(
             {project_id:req.params.id},
